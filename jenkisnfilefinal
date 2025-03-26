@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Build Stage') {
             agent {
-                label 'jfrog'
+                label 'Jfrog'
             }
             steps {
                 sh 'mvn clean install'
@@ -16,7 +16,7 @@ pipeline {
             post {
                 success {
                     script {
-                        def server = Artifactory.newServer(url: 'http://65.2.190.224:8081/artifactory/', credentialsId: 'jfrog')
+                        def server = Artifactory.newServer(url: 'http://3.109.183.103/:8081/artifactory/', credentialsId: 'Jfrog')
                         def rtMaven = Artifactory.newMavenBuild()
                         rtMaven.deployer server: server, releaseRepo: 'libs-release/', snapshotRepo: 'libs-snapshot/'
                         rtMaven.tool = 'maven'
@@ -31,13 +31,13 @@ pipeline {
             }
             steps {
                 script {
-                    sh 'curl -o jenkins-test-1.0.jar http://65.2.190.224:8081/artifactory/libs-release/com/example/jenkins-test/1.0/jenkins-test-1.0.jar'
+                    sh 'curl -o jenkins-test-1.0.jar http://3.109.183.103:8081/artifactory/libs-release/com/example/jenkins-test/1.0/jenkins-test-1.0.jar'
                    
                     sh '''
-                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin 804480554088.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin 711387095864.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
                         docker build -t sstest .
-                        docker tag sstest:latest 804480554088.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/sstest:latest
-                        docker push 804480554088.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/sstest:latest
+                        docker tag sstest:latest 711387095864.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/sstest:latest
+                        docker push 711387095864.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/sstest:latest
                         aws eks update-kubeconfig --region ap-south-1 --name cluster-eksctl
                         kubectl apply -f manifest.yaml
                         sleep 10
