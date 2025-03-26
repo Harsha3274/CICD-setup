@@ -5,60 +5,52 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
         AWS_DEFAULT_REGION    = 'ap-south-1'
     }
-    tools {
-        maven 'Maven 3.8.6'  // Ensure this matches Jenkins Global Tool Configuration
-    }
     stages {
-        
         stage('Scanning Stage') {
-            agent { label 'Sonar' }  // Runs on the SonarQube agent
-            steps {
-                withSonarQubeEnv('Sonarcube') { 
-                    sh "mvn clean verify sonar:sonar -Dsonar.projectKey=demo"
-                }
+            agent {
+                label 'Sonar' // Runs on the SonarQube agent
             }
-        }
-
-        stage('Build Stage') {
-            agent { label 'Master' }  // Runs on the Jenkins Master Node
             steps {
-                withEnv(["PATH=/opt/maven/bin:$PATH"]) {  // Adjust based on your Maven location
-                    sh 'mvn clean install'
-                }
+             withSonarQubeEnv('Sonarcube') { 
+                    sh "mvn clean verify sonar:sonar -Dsonar.projectKey=demo"
+                } 
+             }
+          }
+        stage('Build Stage') {
+            agent {
+                label 'Master' // Runs on the Jenkisn Master Node
+            }
+            steps {
+                sh 'mvn clean install'
             }
             post {
                 success {
                     script {
-                        def server = Artifactory.newServer(
-                            url: 'http://3.109.183.103:8081/artifactory/', 
-                            credentialsId: 'Jfrog'
-                        )
+                        def server = Artifactory.newServer(url: 'http://3.109.183.103:8081/artifactory/', credentialsId: 'Jfrog')
                         def rtMaven = Artifactory.newMavenBuild()
                         rtMaven.deployer server: server, releaseRepo: 'libs-release/', snapshotRepo: 'libs-snapshot/'
-                        rtMaven.tool = 'Maven 3.8.6'  // Ensure this matches the configured tool name
+                        rtMaven.tool = 'maven'
                         rtMaven.run(pom: 'pom.xml', goals: 'clean install')
                     }
                 }
             }
         }
-
         stage('Deploy and Push to ECR') {
-            agent { label 'deploy' }  // Runs on the Deploy agent
+            agent {
+                label 'deploy'    // Runs on the Deploy agent
+            }
             steps {
                 script {
                     sh 'curl -o jenkins-test-1.0.jar http://3.109.183.103:8081/artifactory/libs-release/com/example/jenkins-test/1.0/jenkins-test-1.0.jar'
-                    
+                   
                     sh '''
-                        # Authenticate Docker with AWS ECR
                         aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin 711387095864.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
-                        
-                        # Build and push Docker image
                         docker build -t sstest .
                         docker tag sstest:latest 711387095864.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/sstest:latest
                         docker push 711387095864.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/sstest:latest
 
-                        # Update kubeconfig and deploy to EKS
-                        aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name cluster-eksctl
+                        # Update kubeconfig to interact with EKS
+                        aws eks update-kubeconfig --region ap-south-1 --name cluster-eksctl
                         kubectl apply -f manifest.yaml
                         sleep 10
                         kubectl get pods -n ss-dev
